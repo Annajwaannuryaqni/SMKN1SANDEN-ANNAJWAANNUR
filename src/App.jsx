@@ -1,11 +1,14 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import ListRequest from './pages/ListRequest';
-import AddRequest from './pages/AddRequest'; // <-- Tambahkan import ini
+import AddRequest from './pages/AddRequest';
+// Import EditRequest jika kamu sudah membuatnya
+// import EditRequest from './pages/EditRequest'; 
 
 function App() {
+  // Gunakan 'access_token' agar sinkron dengan login dan list
   const isAuthenticated = () => {
-    return localStorage.getItem('token') !== null;
+    return localStorage.getItem('access_token') !== null;
   };
 
   return (
@@ -19,9 +22,14 @@ function App() {
           element={isAuthenticated() ? <ListRequest /> : <Navigate to="/login" />} 
         />
         
-        {/* Tambahkan Route Baru untuk Tambah Data */}
         <Route 
           path="/add" 
+          element={isAuthenticated() ? <AddRequest /> : <Navigate to="/login" />} 
+        />
+
+        {/* Route Edit dengan parameter id */}
+        <Route 
+          path="/edit/:id" 
           element={isAuthenticated() ? <AddRequest /> : <Navigate to="/login" />} 
         />
       </Routes>

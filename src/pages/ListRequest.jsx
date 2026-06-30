@@ -1,196 +1,145 @@
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
 
-function ListRequest() {
-  const [dataRequests, setDataRequests] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-  // State Filter sesuai dokumen Farmagitechs
-  const [searchTitle, setSearchTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [productId, setProductId] = useState('');
-
+const ListRequest = () => {
   const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    fetchProducts();
-    fetchRequests();
+    const token = localStorage.getItem('access_token');
+    
+    fetch('http://192.168.0.199:9006/api/product/list?page=0', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(res => setProducts(res.data || []))
+    .catch(() => console.log('Gagal load produk filter'));
+
+    fetchData();
   }, []);
 
-  // Ambil daftar produk untuk dropdown filter
-  const fetchProducts = async () => {
-    try {
-      const response = await api.get('/api/product/list?page=0');
-      setProducts(response.data?.data || []);
-    } catch (err) {
-      console.error('Gagal memuat produk:', err);
-    }
-  };
+  const fetchData = async (prodId = '') => {
+    setIsLoading(true);
+    setErrorMsg('');
+    const token = localStorage.getItem('access_token');
+    
+    let url = 'http://192.168.0.199:9006/api/request/list?page=1&request_type=feature';
+    if (prodId) url += `&product_id=${prodId}`;
 
-  // Ambil daftar request dengan parameter objek Axios yang benar
-  const fetchRequests = async () => {
-    setLoading(true);
-    setError('');
     try {
-      const response = await api.get('/api/request/list', {
-        params: {
-          page: 1,
-          request_type: 'feature',
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-          product_id: productId || undefined
-        }
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      const result = response.data?.data || [];
-      setDataRequests(result);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal mengambil data dari server.');
+      const result = await response.json();
+      if (response.ok) {
+        setRequests(result.data || []);
+      } else {
+        setErrorMsg('Gagal mengambil daftar request.');
+      }
+    } catch (error) {
+      setErrorMsg('Gagal terhubung ke server.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleFilter = (e) => {
     e.preventDefault();
-    fetchRequests();
+    fetchData(selectedProduct);
   };
 
   const handleReset = () => {
-    setStartDate('');
-    setEndDate('');
-    setProductId('');
-    setSearchTitle('');
-    setTimeout(() => {
-      fetchRequests();
-    }, 50);
+    setSelectedProduct('');
+    fetchData('');
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
     navigate('/login');
   };
 
-  // Filter pencarian lokal berdasarkan Title
-  const displayedData = dataRequests.filter((item) =>
-    (item.request_title || '').toLowerCase().includes(searchTitle.toLowerCase())
-  );
-
   return (
-    <div style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>Request List Dashboard</h2>
-        {/* Header Halaman */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>Request List Dashboard</h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={() => navigate('/add')} 
-            style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            + Tambah Request Baru
-          </button>
-          <button 
-            onClick={handleLogout} 
-            style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
+    <div style={{ padding: '30px', backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+          <h2 style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>Daftar Request</h2>
+          <button onClick={handleLogout} style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
             Logout
           </button>
         </div>
-      </div>
-        <button onClick={handleLogout} style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-          Logout
-        </button>
-      </div>
 
-      {/* Form Filter */}
-      <form onSubmit={handleFilter} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', background: '#f8f9fa', padding: '15px', borderRadius: '6px' }}>
-        <input 
-          type="date" 
-          value={startDate} 
-          onChange={(e) => setStartDate(e.target.value)} 
-          style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-        />
-        <input 
-          type="date" 
-          value={endDate} 
-          onChange={(e) => setEndDate(e.target.value)} 
-          style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-        />
-        <select 
-          value={productId} 
-          onChange={(e) => setProductId(e.target.value)} 
-          style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-        >
-          <option value="">-- Semua Product --</option>
-          {products.map((prod) => (
-            <option key={prod.product_id} value={prod.product_id}>{prod.product_name}</option>
-          ))}
-        </select>
-        <button type="submit" style={{ padding: '8px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Filter</button>
-        <button type="button" onClick={handleReset} style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Reset</button>
-        
-        <input 
-          type="text" 
-          placeholder="Cari Title..." 
-          value={searchTitle} 
-          onChange={(e) => setSearchTitle(e.target.value)} 
-          style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', marginLeft: 'auto', width: '200px' }}
-        />
-      </form>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <button onClick={() => navigate('/add')} style={{ backgroundColor: '#28a745', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+            + Tambah Request
+          </button>
+          <button onClick={() => fetchData(selectedProduct)} style={{ backgroundColor: '#17a2b8', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+            🔄 Refresh Data
+          </button>
+        </div>
 
-      {/* Tabel Data */}
-      {loading ? (
-        <p>Sedang memuat data dari FG-Basement...</p>
-      ) : error ? (
-        <div style={{ padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px' }}>{error}</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#007bff', color: 'white', textAlign: 'left' }}>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>No</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Title</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Hospital Name</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Product</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Status</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Request Time</th>
-              <th style={{ padding: '12px', border: '1px solid #ddd' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => (
-                <tr key={item.request_id || index} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{index + 1}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd', fontWeight: '500' }}>{item.request_title}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{item.hospital?.hospital_name || '-'}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{item.product?.product_name || '-'}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', backgroundColor: item.status === 'done' || item.status === 'accepted' ? '#d4edda' : '#fff3cd', color: item.status === 'done' || item.status === 'accepted' ? '#155724' : '#856404' }}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{new Date(item.request_time).toLocaleDateString('id-ID')}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                    <button style={{ padding: '5px 10px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>Lihat</button>
-                    <button style={{ padding: '5px 10px', backgroundColor: '#ffc107', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Edit</button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#777' }}>Data tidak ditemukan (Empty State)</td>
+        <form onSubmit={handleFilter} style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap', backgroundColor: '#f1f3f5', padding: '15px', borderRadius: '6px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#495057' }}>Filter Produk:</span>
+          <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px', backgroundColor: '#fff' }}>
+            <option value="">Semua Product</option>
+            {products.map(p => (
+              <option key={p.product_id} value={p.product_id}>{p.product_name}</option>
+            ))}
+          </select>
+          <button type="submit" style={{ backgroundColor: '#007bff', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Filter</button>
+          <button type="button" onClick={handleReset} style={{ backgroundColor: '#6c757d', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset</button>
+        </form>
+
+        {errorMsg && <div style={{ color: '#721c24', backgroundColor: '#f8d7da', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>{errorMsg}</div>}
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#e9ecef', borderBottom: '2px solid #dee2e6' }}>
+                <th style={{ padding: '12px', width: '50px' }}>No</th>
+                <th style={{ padding: '12px' }}>Title</th>
+                <th style={{ padding: '12px' }}>Hospital Name</th>
+                <th style={{ padding: '12px' }}>Product</th>
+                <th style={{ padding: '12px' }}>Status</th>
+                <th style={{ padding: '12px' }}>Request Time</th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>Memuat data...</td></tr>
+              ) : requests.length === 0 ? (
+                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#6c757d' }}>Tidak ada data request.</td></tr>
+              ) : (
+                requests.map((req, index) => (
+                  <tr key={req.request_id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                    <td style={{ padding: '12px' }}>{index + 1}</td>
+                    <td style={{ padding: '12px', fontWeight: 'bold', color: '#007bff' }}>{req.request_title}</td>
+                    <td style={{ padding: '12px' }}>{req.hospital?.hospital_name || 'RS Farmagi'}</td>
+                    <td style={{ padding: '12px' }}>{req.product?.product_name || '-'}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ backgroundColor: req.status === 'accepted' ? '#d4edda' : '#fff3cd', color: req.status === 'accepted' ? '#155724' : '#856404', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                        {req.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}>{new Date(req.request_time).toLocaleDateString('id-ID')}</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <button onClick={() => navigate(`/edit/${req.request_id}`)} style={{ backgroundColor: '#ffc107', color: '#000', border: 'none', padding: '5px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', marginRight: '5px', fontWeight: 'bold' }}>Edit</button>
+                      <button style={{ backgroundColor: '#17a2b8', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>Lihat</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
-}
+};
 
 export default ListRequest;
